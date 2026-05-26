@@ -30,4 +30,4 @@ DocuMind is an intelligent, full-stack AI Document Manager that acts as your per
 2. Install dependencies: `npm install`
 3. Run the development server: `npm run dev`
 
-*Developed as a Portfolio Project showcasing Agentic AI capabilities.*
+
