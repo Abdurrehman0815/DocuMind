@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
 from app.models.chunk import DocumentChunk
-from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,7 @@ class LocalEmbeddingModel:
             # We explicitly DO NOT cache this globally to save RAM.
             # We load the model, generate embeddings, and instantly delete it from memory.
             # all-MiniLM-L6-v2 uses ~90MB RAM compared to BAAI's ~130MB, both are 384-dimensional
+            from fastembed import TextEmbedding
             model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
             
             # fastembed returns an iterator of numpy arrays, we convert to list of lists
