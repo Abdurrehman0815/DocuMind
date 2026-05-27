@@ -104,16 +104,16 @@ export default function Search() {
               {results.map((result) => (
                 <div key={result.id} className="glass-panel rounded-2xl p-6 border border-white/5 hover:border-blue-500/30 transition-all hover:bg-white/5 group">
                   <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 flex-shrink-0">
                         {result.content_type?.startsWith("image/") ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                       </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{result.filename}</h4>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                          <span>{formatDate(result.created_at)}</span>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors truncate">{result.filename}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 truncate">
+                          <span className="flex-shrink-0">{formatDate(result.created_at)}</span>
                           {result.category && (
-                            <span className="px-2 py-0.5 rounded-full bg-white/10 text-white font-medium">
+                            <span className="px-2 py-0.5 rounded-full bg-white/10 text-white font-medium truncate">
                               {result.category}
                             </span>
                           )}

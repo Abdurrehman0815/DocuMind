@@ -97,24 +97,24 @@ export default function Reminders() {
             
             return (
               <div key={reminder.id} className={`glass-panel rounded-2xl p-6 border ${urgencyClass.split(' ')[2]}`}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
+                <div className="flex justify-between items-start mb-4 gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider ${urgencyClass.split(' ').slice(0, 2).join(' ')}`}>
                         {reminder.priority}
                       </span>
-                      <span className="text-sm text-gray-400 font-medium">
+                      <span className="text-sm text-gray-400 font-medium whitespace-nowrap">
                         {getUrgencyText(reminder.date)}
                       </span>
                     </div>
-                    <h3 className="text-lg font-bold text-white">{reminder.provider || reminder.category || "Document"}</h3>
-                    <p className="text-sm text-gray-400 flex items-center gap-1 mt-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDate(reminder.date)}
+                    <h3 className="text-lg font-bold text-white truncate">{reminder.provider || reminder.filename || reminder.category || "Document"}</h3>
+                    <p className="text-sm text-gray-400 flex items-center gap-1 mt-1 truncate">
+                      <Clock className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{formatDate(reminder.date)}</span>
                     </p>
                   </div>
                   {reminder.amount && (
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <span className="text-2xl font-bold text-white">{reminder.amount}</span>
                     </div>
                   )}
