@@ -24,14 +24,12 @@ def generate_chat_response(query: str, user_id: int, db: Session, document_id: i
         return "I'm having trouble understanding your query right now."
 
     # 2. Vector Search (pgvector cosine distance)
-    embedding_str = f"[{','.join(map(str, query_embedding))}]"
-    
     try:
         base_query = db.query(DocumentChunk, Document).join(Document, DocumentChunk.document_id == Document.id).filter(Document.user_id == user_id)
         if document_id:
             base_query = base_query.filter(DocumentChunk.document_id == document_id)
             
-        results = base_query.order_by(DocumentChunk.embedding.cosine_distance(embedding_str)).limit(5).all()
+        results = base_query.order_by(DocumentChunk.embedding.cosine_distance(query_embedding)).limit(5).all()
             
         if not results:
             return "You haven't uploaded any documents yet, or I couldn't find any relevant information."
