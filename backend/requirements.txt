@@ -13,6 +13,7 @@ python-multipart>=0.0.9
 psycopg2-binary>=2.9.9
 langchain-text-splitters>=0.2.0
 fastembed>=0.2.7
+rapidocr-onnxruntime>=1.4.0
 pgvector>=0.3.0
 twilio>=9.0.0
 apscheduler>=3.10.0
