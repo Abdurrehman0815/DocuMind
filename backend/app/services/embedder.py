@@ -5,7 +5,6 @@ os.environ["USE_TORCH"] = "1"
 
 from sqlalchemy.orm import Session
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
 
 from app.models.chunk import DocumentChunk
 
@@ -17,6 +16,7 @@ _embedding_model_instance = None
 def get_embedding_model():
     global _embedding_model_instance
     if _embedding_model_instance is None:
+        from sentence_transformers import SentenceTransformer
         logger.info("Loading HuggingFace multilingual embedding model...")
         _embedding_model_instance = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         logger.info("Model loaded successfully.")

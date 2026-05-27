@@ -3,8 +3,8 @@ os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"
 
 import json
-import ollama
-from transformers import pipeline
+from groq import Groq
+from app.config.settings import settings
 
 # Lazy load classifier so it doesn't block startup
 _classifier = None
@@ -24,6 +24,7 @@ CATEGORIES = [
 def get_classifier():
     global _classifier
     if _classifier is None:
+        from transformers import pipeline
         # Using a fast, lightweight DistilBERT zero-shot classification model
         # This fixes the tokenizer Enum parsing error on Windows
         _classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
@@ -48,7 +49,7 @@ def classify_document(text: str) -> str:
         return "other"
 
 def extract_entities(text: str, category: str) -> dict:
-    """Extract structured JSON entities from the text using local Ollama."""
+    """Extract structured JSON entities from the text using Groq."""
     if not text or len(text.strip()) == 0:
         return {}
         
@@ -73,25 +74,22 @@ DOCUMENT TEXT:
 """
     
     try:
-        # Ask Ollama to extract the JSON using the user's specific installed model
-        response = ollama.chat(model='llama3.2:3b', messages=[
-            {
-                'role': 'user',
-                'content': prompt
-            }
-        ])
+        # Ask Groq to extract the JSON
+        client = Groq(api_key=settings.groq_api_key)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
         
-        raw_output = response['message']['content'].strip()
-        
-        # Clean up the output in case it wrapped it in markdown code blocks
-        if raw_output.startswith("```json"):
-            raw_output = raw_output[7:]
-        if raw_output.startswith("```"):
-            raw_output = raw_output[3:]
-        if raw_output.endswith("```"):
-            raw_output = raw_output[:-3]
-            
-        parsed_json = json.loads(raw_output.strip())
+        raw_output = response.choices[0].message.content.strip()
+        parsed_json = json.loads(raw_output)
         return parsed_json
     except Exception as e:
         print(f"Entity extraction error: {e}")
