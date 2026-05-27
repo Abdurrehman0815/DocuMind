@@ -1,34 +1,30 @@
 import logging
-import json
-import urllib.request
-import urllib.error
 from sqlalchemy.orm import Session
 from app.models.chunk import DocumentChunk
+from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
-# HuggingFace Free Inference API for embeddings (No API key needed for basic usage, rate limited)
-HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+# Lazy load the local embedding model so it doesn't block startup
+_local_model = None
 
-class APIEmbeddingModel:
+class LocalEmbeddingModel:
     def encode(self, texts):
+        global _local_model
         try:
-            data = json.dumps({"inputs": texts}).encode("utf-8")
-            req = urllib.request.Request(HF_API_URL, data=data, headers={"Content-Type": "application/json"})
+            if _local_model is None:
+                # BAAI/bge-small-en-v1.5 generates 384-dimensional embeddings like all-MiniLM-L6-v2
+                _local_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
             
-            with urllib.request.urlopen(req, timeout=10.0) as response:
-                if response.status == 200:
-                    response_data = json.loads(response.read().decode("utf-8"))
-                    return response_data
-                else:
-                    logger.error(f"HF API Error: {response.status}")
-                    return [[0.0] * 384 for _ in texts]
+            # fastembed returns an iterator of numpy arrays, we convert to list of lists
+            embeddings = list(_local_model.embed(texts))
+            return [emb.tolist() for emb in embeddings]
         except Exception as e:
-            logger.error(f"Embedding request failed: {e}")
+            logger.error(f"Local embedding failed: {e}")
             return [[0.0] * 384 for _ in texts]
 
 def get_embedding_model():
-    return APIEmbeddingModel()
+    return LocalEmbeddingModel()
 
 def embed_document_text(document_id: int, text: str, db: Session):
     """
