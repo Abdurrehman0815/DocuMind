@@ -29,26 +29,33 @@ def parse_pdf(file_bytes: bytes) -> str:
             
     return text.strip()
 
-# Lazy load OCR engine
-_ocr_engine = None
+import requests
 
-def parse_image_with_ocr(file_bytes: bytes) -> str:
-    """Extract text from an image using local RapidOCR (ONNX)."""
-    global _ocr_engine
+def parse_image_with_ocrspace(file_bytes: bytes, filename: str) -> str:
+    """Extract text from an image using the free OCR.Space API to save RAM."""
     try:
-        if _ocr_engine is None:
-            from rapidocr_onnxruntime import RapidOCR
-            _ocr_engine = RapidOCR()
-            
-        result, _ = _ocr_engine(file_bytes)
+        url = "https://api.ocr.space/parse/image"
+        payload = {
+            'apikey': 'helloworld',
+            'language': 'eng',
+            'scale': True,
+            'OCREngine': 2 # Engine 2 is better for receipts/documents
+        }
+        files = {
+            'file': (filename, file_bytes)
+        }
         
-        if result:
-            # result is a list of tuples: [([[x,y],...], text, confidence)]
-            text = "\n".join([line[1] for line in result])
+        response = requests.post(url, data=payload, files=files, timeout=30)
+        result = response.json()
+        
+        if result.get("ParsedResults") and not result.get("IsErroredOnProcessing"):
+            text = result["ParsedResults"][0].get("ParsedText", "")
             return text.strip()
-        return ""
+        else:
+            print(f"OCR.Space Error: {result.get('ErrorMessage')}")
+            return ""
     except Exception as e:
-        print(f"RapidOCR error: {e}")
+        print(f"OCR.Space request failed: {e}")
         return ""
 
 def process_document_background(document_id: int):
@@ -75,7 +82,7 @@ def process_document_background(document_id: int):
         if doc.content_type == "application/pdf":
             extracted_text = parse_pdf(file_bytes)
         elif doc.content_type in ["image/png", "image/jpeg", "image/jpg"]:
-            extracted_text = parse_image_with_ocr(file_bytes)
+            extracted_text = parse_image_with_ocrspace(file_bytes, doc.filename)
             
         doc.extracted_text = extracted_text
         
@@ -94,7 +101,12 @@ def process_document_background(document_id: int):
             db.commit()
             
             # 3. Vector Embeddings (RAG Memory)
-            embed_document_text(doc.id, extracted_text, db)
+            # Run in a separate process to guarantee the OS reclaims the memory instantly!
+            import subprocess
+            import sys
+            print(f"Spawning separate process for embeddings for doc {doc.id}...")
+            # Use the same python executable running the current process
+            subprocess.run([sys.executable, "-m", "app.services.run_embeddings", str(doc.id)])
             
         # Update database with final status
         doc.status = "processed"
