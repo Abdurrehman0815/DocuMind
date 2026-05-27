@@ -76,10 +76,10 @@ def check_upcoming_reminders():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    # Run every day at 9:00 AM
+    # Run every day at 15:30 UTC (which is exactly 9:00 PM IST)
     scheduler.add_job(
         check_upcoming_reminders,
-        trigger=CronTrigger(hour=9, minute=0),
+        trigger=CronTrigger(hour=15, minute=30),
         id="daily_reminder_job",
         name="Check deadlines and send WhatsApp notifications",
         replace_existing=True

@@ -83,3 +83,16 @@ def test_whatsapp(current_user = Depends(get_current_user)):
         return {"message": "Test WhatsApp message sent successfully."}
     else:
         return {"error": "Failed to send WhatsApp message. Please check Twilio configuration."}
+
+@router.post("/trigger")
+def trigger_reminders_manually(current_user = Depends(get_current_user)):
+    """
+    Manually trigger the background job that sends WhatsApp reminders.
+    Useful for testing the actual cron job logic immediately.
+    """
+    try:
+        from app.services.scheduler import check_upcoming_reminders
+        check_upcoming_reminders()
+        return {"message": "Reminders triggered successfully! If any documents are due within 3 days, you will receive a WhatsApp message right now."}
+    except Exception as e:
+        return {"error": str(e)}
