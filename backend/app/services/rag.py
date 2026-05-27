@@ -18,7 +18,7 @@ def generate_chat_response(query: str, user_id: int, db: Session, document_id: i
     # 1. Embed query
     try:
         model = get_embedding_model()
-        query_embedding = model.encode([query])[0].tolist()
+        query_embedding = model.encode([query])[0]
     except Exception as e:
         print(f"Embedding error: {e}")
         return "I'm having trouble understanding your query right now."

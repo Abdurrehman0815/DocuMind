@@ -57,7 +57,6 @@ def embed_document_text(document_id: int, text: str, db: Session):
         for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
             doc_chunk = DocumentChunk(
                 document_id=document_id,
-                chunk_index=i,
                 content=chunk_text,
                 embedding=embedding
             )

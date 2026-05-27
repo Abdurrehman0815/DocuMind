@@ -16,7 +16,7 @@ def search_documents(q: str, db: Session = Depends(get_db), current_user = Depen
         return []
         
     model = get_embedding_model()
-    query_embedding = model.encode([q])[0].tolist()
+    query_embedding = model.encode([q])[0]
     
     # We find the chunks that match, and then group by document to return unique documents
     # The documents are returned ordered by the best matching chunk
