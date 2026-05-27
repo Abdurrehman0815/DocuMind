@@ -5,20 +5,24 @@ from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
-# Lazy load the local embedding model so it doesn't block startup
-_local_model = None
-
 class LocalEmbeddingModel:
     def encode(self, texts):
-        global _local_model
+        import gc
         try:
-            if _local_model is None:
-                # BAAI/bge-small-en-v1.5 generates 384-dimensional embeddings like all-MiniLM-L6-v2
-                _local_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            # We explicitly DO NOT cache this globally to save RAM.
+            # We load the model, generate embeddings, and instantly delete it from memory.
+            # all-MiniLM-L6-v2 uses ~90MB RAM compared to BAAI's ~130MB, both are 384-dimensional
+            model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
             
             # fastembed returns an iterator of numpy arrays, we convert to list of lists
-            embeddings = list(_local_model.embed(texts))
-            return [emb.tolist() for emb in embeddings]
+            embeddings = list(model.embed(texts))
+            result = [emb.tolist() for emb in embeddings]
+            
+            # Explicitly free memory to prevent Render 512MB OOM crash
+            del model
+            gc.collect()
+            
+            return result
         except Exception as e:
             logger.error(f"Local embedding failed: {e}")
             return [[0.0] * 384 for _ in texts]

@@ -91,6 +91,7 @@ def process_document_background(document_id: int):
             # Using Groq to extract entities
             entities = extract_entities(extracted_text, category)
             doc.extracted_entities = entities
+            db.commit()
             
             # 3. Vector Embeddings (RAG Memory)
             embed_document_text(doc.id, extracted_text, db)
