@@ -128,7 +128,7 @@ def summarize_document(
     if not doc.extracted_text:
         raise HTTPException(status_code=400, detail="Document has no extracted text to summarize. Please wait for OCR to finish.")
         
-    import ollama
+    from groq import Groq
     
     prompt = f"""You are an expert at summarizing documents. Please read the following document and provide:
 1. A very short 1-2 sentence overview.
@@ -142,9 +142,14 @@ SUMMARY:
 """
     
     try:
-        response = ollama.chat(model='llama3.2:3b', messages=[
-            {'role': 'user', 'content': prompt}
-        ])
-        return {"summary": response['message']['content'].strip()}
+        client = Groq(api_key=settings.groq_api_key)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+        return {"summary": response.choices[0].message.content.strip()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")

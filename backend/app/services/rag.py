@@ -1,71 +1,73 @@
-import ollama
+import json
+from groq import Groq
 from sqlalchemy.orm import Session
-from sqlalchemy import asc
-
 from app.models.chunk import DocumentChunk
 from app.models.document import Document
 from app.services.embedder import get_embedding_model
+from app.config.settings import settings
 
-def generate_chat_response(query: str, user_id: str, db: Session, document_id: int = None, language: str = "English") -> str:
+def generate_chat_response(query: str, user_id: int, db: Session, document_id: int = None, language: str = "English") -> str:
     """
-    RAG Engine:
+    RAG Implementation:
     1. Embeds the user query
-    2. Searches the pgvector database for similar chunks
-    3. Feeds context + query to Ollama
-    4. Returns the AI response
+    2. Searches pgvector for top 3 similar chunks
+    3. Feeds context + query to Groq
+    4. Returns answer in the requested language
     """
     
-    # 1. Generate embedding for the query
-    model = get_embedding_model()
-    query_embedding = model.encode([query])[0].tolist()
+    # 1. Embed query
+    try:
+        model = get_embedding_model()
+        query_embedding = model.encode([query])[0].tolist()
+    except Exception as e:
+        print(f"Embedding error: {e}")
+        return "I'm having trouble understanding your query right now."
+
+    # 2. Vector Search (pgvector cosine distance)
+    embedding_str = f"[{','.join(map(str, query_embedding))}]"
     
-    # 2. Search for top 3 similar chunks
-    base_query = db.query(DocumentChunk).join(Document).filter(Document.user_id == user_id)
-    
-    if document_id:
-        base_query = base_query.filter(DocumentChunk.document_id == document_id)
+    try:
+        base_query = db.query(DocumentChunk, Document).join(Document, DocumentChunk.document_id == Document.id).filter(Document.user_id == user_id)
+        if document_id:
+            base_query = base_query.filter(DocumentChunk.document_id == document_id)
+            
+        results = base_query.order_by(DocumentChunk.embedding.cosine_distance(embedding_str)).limit(5).all()
+            
+        if not results:
+            return "You haven't uploaded any documents yet, or I couldn't find any relevant information."
+            
+        # 3. Build context
+        context_parts = []
+        for chunk, doc in results:
+            context_parts.append(f"--- Document: {doc.filename} ---\n{chunk.content}")
+            
+        context_str = "\n\n".join(context_parts)
         
-    # Order by cosine distance (most similar first)
-    top_chunks = base_query.order_by(
-        DocumentChunk.embedding.cosine_distance(query_embedding)
-    ).limit(3).all()
-    
-    if not top_chunks:
-        return "I couldn't find any relevant documents to answer your question. Please upload some documents first!"
-        
-    # 3. Build the Context
-    context_texts = []
-    for i, chunk in enumerate(top_chunks):
-        context_texts.append(f"--- Document Excerpt {i+1} ---\n{chunk.content}")
-        
-    full_context = "\n\n".join(context_texts)
-    
-    prompt = f"""You are a helpful AI Life Admin Assistant. 
-Answer the user's question based strictly on the following document context.
-If the answer cannot be found in the context, tell the user you don't know based on the provided documents.
-Do not make up facts. Keep the answer clear and concise.
-IMPORTANT: You MUST answer strictly in the following language: {language}.
+        system_prompt = f"""You are a helpful AI Life Admin named DocuMind. 
+Answer the user's question using ONLY the provided document context below.
+If the answer is not contained in the context, say "I cannot find the answer in your documents."
+Always reply in the following language: {language}.
 
 CONTEXT:
-{full_context}
-
-USER QUESTION:
-{query}
-
-ANSWER in {language}:
+{context_str}
 """
-
-    # 4. Generate response with Ollama
-    try:
-        response = ollama.chat(model='llama3.2:3b', messages=[
-            {
-                'role': 'user',
-                'content': prompt
-            }
-        ])
         
-        return response['message']['content'].strip()
-        
+        # 4. Generate response with Groq
+        try:
+            client = Groq(api_key=settings.groq_api_key)
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.2
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"Groq chat error: {e}")
+            return "I'm sorry, my AI brain (Groq) encountered an error while trying to generate a response."
+            
     except Exception as e:
-        print(f"Ollama chat error: {e}")
-        return "I'm sorry, my AI brain (Ollama) encountered an error while trying to generate a response. Make sure it is running!"
+        print(f"Vector search error: {e}")
+        return "Error searching your documents."

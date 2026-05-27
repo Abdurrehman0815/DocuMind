@@ -4,7 +4,7 @@ DocuMind is an intelligent, full-stack AI Document Manager that acts as your per
 
 ## Key Features
 - **Computer Vision OCR**: Automatically extracts raw text from uploaded images (JPG, PNG) and PDFs.
-- **AI Classification & Entity Extraction**: Uses `llama3.2:3b` to categorize documents and cleanly extract due dates, amounts, and account numbers.
+- **AI Classification & Entity Extraction**: Uses `Groq (Llama 3.1 8B)` to categorize documents and cleanly extract due dates, amounts, and account numbers.
 - **Semantic Math Search**: Queries documents using a `paraphrase-multilingual-MiniLM` vector embedding engine powered by PostgreSQL `pgvector`.
 - **Multilingual AI Assistant**: Chat with your documents in English, Hindi, or Tamil using Local RAG.
 - **Smart WhatsApp Reminders**: Runs a background cron job using `apscheduler` and Twilio to ping your phone when a deadline approaches with urgency scoring (CRITICAL, HIGH, MEDIUM).
@@ -13,7 +13,7 @@ DocuMind is an intelligent, full-stack AI Document Manager that acts as your per
 ## Tech Stack
 - **Frontend**: React, Vite, TailwindCSS, React Router
 - **Backend**: FastAPI, SQLAlchemy, APScheduler
-- **AI/ML**: Ollama (Llama 3.2), HuggingFace Transformers, EasyOCR, PyMuPDF
+- **AI/ML**: Groq API (Llama 3.1), HuggingFace Transformers, EasyOCR, PyMuPDF
 - **Database & Storage**: Supabase (PostgreSQL with `pgvector`), Supabase Storage
 - **Notifications**: Twilio API
 

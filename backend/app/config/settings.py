@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     huggingface_token: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
+    groq_api_key: str | None = None
     
     # Twilio / WhatsApp Settings
     twilio_account_sid: Optional[str] = None
