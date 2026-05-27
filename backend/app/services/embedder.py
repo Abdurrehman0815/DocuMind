@@ -1,5 +1,7 @@
 import logging
-import httpx
+import json
+import urllib.request
+import urllib.error
 from sqlalchemy.orm import Session
 from app.models.chunk import DocumentChunk
 
@@ -11,15 +13,16 @@ HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/s
 class APIEmbeddingModel:
     def encode(self, texts):
         try:
-            # We must pass strings as a list to the API
-            response = httpx.post(HF_API_URL, json={"inputs": texts}, timeout=10.0)
-            if response.status_code == 200:
-                # The API returns a list of embeddings
-                return response.json()
-            else:
-                logger.error(f"HF API Error: {response.text}")
-                # Fallback zero embedding if API fails
-                return [[0.0] * 384 for _ in texts]
+            data = json.dumps({"inputs": texts}).encode("utf-8")
+            req = urllib.request.Request(HF_API_URL, data=data, headers={"Content-Type": "application/json"})
+            
+            with urllib.request.urlopen(req, timeout=10.0) as response:
+                if response.status == 200:
+                    response_data = json.loads(response.read().decode("utf-8"))
+                    return response_data
+                else:
+                    logger.error(f"HF API Error: {response.status}")
+                    return [[0.0] * 384 for _ in texts]
         except Exception as e:
             logger.error(f"Embedding request failed: {e}")
             return [[0.0] * 384 for _ in texts]
