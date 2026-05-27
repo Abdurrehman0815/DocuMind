@@ -29,33 +29,26 @@ def parse_pdf(file_bytes: bytes) -> str:
             
     return text.strip()
 
-def parse_image_with_groq(file_bytes: bytes, mime_type: str) -> str:
-    """Extract text from an image using Groq Vision API."""
+# Lazy load OCR engine
+_ocr_engine = None
+
+def parse_image_with_ocr(file_bytes: bytes) -> str:
+    """Extract text from an image using local RapidOCR (ONNX)."""
+    global _ocr_engine
     try:
-        base64_image = base64.b64encode(file_bytes).decode('utf-8')
-        client = Groq(api_key=settings.groq_api_key)
+        if _ocr_engine is None:
+            from rapidocr_onnxruntime import RapidOCR
+            _ocr_engine = RapidOCR()
+            
+        result, _ = _ocr_engine(file_bytes)
         
-        response = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Extract all the text from this image exactly as it appears. Do not add any extra commentary, just return the text."},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime_type};base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            temperature=0.0
-        )
-        return response.choices[0].message.content.strip()
+        if result:
+            # result is a list of tuples: [([[x,y],...], text, confidence)]
+            text = "\n".join([line[1] for line in result])
+            return text.strip()
+        return ""
     except Exception as e:
-        print(f"Groq Vision error: {e}")
+        print(f"RapidOCR error: {e}")
         return ""
 
 def process_document_background(document_id: int):
@@ -82,7 +75,7 @@ def process_document_background(document_id: int):
         if doc.content_type == "application/pdf":
             extracted_text = parse_pdf(file_bytes)
         elif doc.content_type in ["image/png", "image/jpeg", "image/jpg"]:
-            extracted_text = parse_image_with_groq(file_bytes, doc.content_type)
+            extracted_text = parse_image_with_ocr(file_bytes)
             
         doc.extracted_text = extracted_text
         
