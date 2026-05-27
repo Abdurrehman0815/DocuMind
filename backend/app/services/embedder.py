@@ -1,66 +1,70 @@
-import os
 import logging
-os.environ["USE_TF"] = "0"
-os.environ["USE_TORCH"] = "1"
-
+import httpx
 from sqlalchemy.orm import Session
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from app.models.chunk import DocumentChunk
 
 logger = logging.getLogger(__name__)
 
-# Lazy load the embedding model
-_embedding_model_instance = None
+# HuggingFace Free Inference API for embeddings (No API key needed for basic usage, rate limited)
+HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+class APIEmbeddingModel:
+    def encode(self, texts):
+        try:
+            # We must pass strings as a list to the API
+            response = httpx.post(HF_API_URL, json={"inputs": texts}, timeout=10.0)
+            if response.status_code == 200:
+                # The API returns a list of embeddings
+                return response.json()
+            else:
+                logger.error(f"HF API Error: {response.text}")
+                # Fallback zero embedding if API fails
+                return [[0.0] * 384 for _ in texts]
+        except Exception as e:
+            logger.error(f"Embedding request failed: {e}")
+            return [[0.0] * 384 for _ in texts]
 
 def get_embedding_model():
-    global _embedding_model_instance
-    if _embedding_model_instance is None:
-        from sentence_transformers import SentenceTransformer
-        logger.info("Loading HuggingFace multilingual embedding model...")
-        _embedding_model_instance = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-        logger.info("Model loaded successfully.")
-    return _embedding_model_instance
+    return APIEmbeddingModel()
 
 def embed_document_text(document_id: int, text: str, db: Session):
     """
-    Chunks the document text, generates vector embeddings, 
-    and saves them to the pgvector database.
+    Splits the text into chunks, generates embeddings using HF API, and saves to pgvector.
     """
     if not text or len(text.strip()) == 0:
         return
         
     try:
-        # 1. Chunk the text
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50,
-            length_function=len,
-            is_separator_regex=False,
-        )
-        chunks = text_splitter.split_text(text)
+        logger.info(f"Chunking document {document_id}")
         
-        if not chunks:
-            return
+        # We use a simple manual text splitter instead of langchain to save memory
+        def simple_chunker(text, chunk_size=500, overlap=50):
+            words = text.split()
+            chunks = []
+            i = 0
+            while i < len(words):
+                chunk = " ".join(words[i:i+chunk_size])
+                chunks.append(chunk)
+                i += chunk_size - overlap
+            return chunks
             
-        # 2. Generate embeddings
+        chunks = simple_chunker(text)
+        logger.info(f"Created {len(chunks)} chunks. Generating embeddings via API...")
+        
         model = get_embedding_model()
-        # encode() returns a list of numpy arrays (or tensors). We convert to list of floats for pgvector.
         embeddings = model.encode(chunks)
         
-        # 3. Save to database
-        for i, chunk_text in enumerate(chunks):
-            embedding_vector = embeddings[i].tolist()
-            
-            new_chunk = DocumentChunk(
+        for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+            doc_chunk = DocumentChunk(
                 document_id=document_id,
+                chunk_index=i,
                 content=chunk_text,
-                embedding=embedding_vector
+                embedding=embedding
             )
-            db.add(new_chunk)
+            db.add(doc_chunk)
             
         db.commit()
-        print(f"Successfully embedded {len(chunks)} chunks for document {document_id}")
-        
+        logger.info(f"Saved {len(chunks)} embeddings to pgvector for document {document_id}")
+            
     except Exception as e:
         print(f"Embedding error for document {document_id}: {e}")

@@ -1,13 +1,7 @@
 import os
-os.environ["USE_TF"] = "0"
-os.environ["USE_TORCH"] = "1"
-
 import json
 from groq import Groq
 from app.config.settings import settings
-
-# Lazy load classifier so it doesn't block startup
-_classifier = None
 
 CATEGORIES = [
     "electricity bill",
@@ -21,29 +15,35 @@ CATEGORIES = [
     "other"
 ]
 
-def get_classifier():
-    global _classifier
-    if _classifier is None:
-        from transformers import pipeline
-        # Using a fast, lightweight DistilBERT zero-shot classification model
-        # This fixes the tokenizer Enum parsing error on Windows
-        _classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
-    return _classifier
-
 def classify_document(text: str) -> str:
-    """Classify the text into one of the predefined categories using HuggingFace."""
+    """Classify the text into one of the predefined categories using Groq."""
     if not text or len(text.strip()) == 0:
         return "other"
         
     try:
-        classifier = get_classifier()
-        # Truncate text for classification to avoid token limits
+        client = Groq(api_key=settings.groq_api_key)
         truncated_text = text[:1500] 
-        result = classifier(truncated_text, CATEGORIES)
         
-        # result['labels'][0] contains the highest scoring category
-        best_category = result['labels'][0]
-        return best_category
+        prompt = f"""You are an expert document classifier. Categorize the following document text into EXACTLY ONE of these categories: {', '.join(CATEGORIES)}.
+Do not output anything else except the exact category name.
+
+DOCUMENT TEXT:
+{truncated_text}
+"""
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0
+        )
+        
+        result = response.choices[0].message.content.strip().lower()
+        
+        # Verify it's a valid category
+        for cat in CATEGORIES:
+            if cat in result:
+                return cat
+                
+        return "other"
     except Exception as e:
         print(f"Classification error: {e}")
         return "other"
